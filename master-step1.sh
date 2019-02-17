@@ -1,17 +1,46 @@
 #!/bin/bash
 
-MASTER_IP=192.168.1.200
-WORKER1_IP=192.168.1.202
-WORKER2_IP=192.168.1.203
+function check_parm()
+{
+  if [ "${2}" == "" ]; then
+    echo -n "${1}"
+    return 1
+  else
+    return 0
+  fi
+}
 
-WORKER_IP=('192.168.1.202' '192.168.1.203')
+if [ -f ./cluster-info ]; then
+        source ./cluster-info
+fi
 
-MASTER_HOSTNAME=prod-k8s-master-01.sanyu.com
-WORKER1_HOSTNAME=prod-k8s-node-01.sanyu.com
-WORKER2_HOSTNAME=prod-k8s-node-02.sanyu.com
 
-WORKER_HOSTNAME=('prod-k8s-node-01.sanyu.com' 'prod-k8s-node-02.sanyu.com')
-WORKER_NUM=${#WORKER_HOSTNAME[@]}
+echo """
+cluster-info:
+  master-01:        ${CP0_IP}
+  master-02:        ${CP1_IP}
+  master-02:        ${CP2_IP}
+  VIP:              ${VIP}
+  Net Interface:    ${NET_IF}
+  CIDR:             ${CIDR}
+"""
+echo -n 'Please print "yes" to continue or "no" to cancel: '
+read AGREE
+while [ "${AGREE}" != "yes" ]; do
+        if [ "${AGREE}" == "no" ]; then
+                exit 0;
+        else
+                echo -n 'Please print "yes" to continue or "no" to cancel: '
+                read AGREE
+        fi
+done
+
+
+MASTER_IP=${CP0_IP}
+PREFIX_HOSTNAME="prod-k8s"
+
+WORKER_NUM=${#WORKER_IP[@]}
+
 
 alias cp='cp -f'
 alias mv='mv -f'
@@ -21,7 +50,7 @@ KUBE_VERSION='v1.12.0-rc.1'
 
 yum -y install wget
 
-hostnamectl set-hostname $MASTER_HOSTNAME
+hostnamectl set-hostname ${PREFIX_HOSTNAME}-master-0
 
 wget --timestamping \
   http://pkg.cfssl.org/R1.2/cfssl_linux-amd64 \
@@ -106,7 +135,7 @@ for ((i=0;i<$WORKER_NUM;i++))
   do
   cat > worker-$(($i+1))-csr.json <<EOF
 {
-  "CN": "system:node:${WORKER_HOSTNAME[$i]}",
+  "CN": "system:node:${PREFIX_HOSTNAME}-node-$(($i+1))",
   "key": {
     "algo": "rsa",
     "size": 2048
@@ -127,7 +156,7 @@ cfssl gencert \
   -ca=ca.pem \
   -ca-key=ca-key.pem \
   -config=ca-config.json \
-  -hostname=${WORKER_HOSTNAME[$i]},${WORKER_IP[$i]} \
+  -hostname=${PREFIX_HOSTNAME}-node-$(($i+1)),${WORKER_IP[$i]} \
   -profile=kubernetes \
   worker-$(($i+1))-csr.json | cfssljson -bare worker-$(($i+1))
 

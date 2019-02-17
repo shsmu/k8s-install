@@ -1,15 +1,27 @@
 #!/bin/bash
 
-WORKER1_HOSTNAME=prod-k8s-node-01.sanyu.com
-WORKER2_HOSTNAME=prod-k8s-node-02.sanyu.com
+function check_parm()
+{
+  if [ "${2}" == "" ]; then
+    echo -n "${1}"
+    return 1
+  else
+    return 0
+  fi
+}
 
-WORKER_HOSTNAME=('prod-k8s-node-01.sanyu.com' 'prod-k8s-node-02.sanyu.com')
-WORKER_NUM=${#WORKER_HOSTNAME[@]}
+if [ -f ./cluster-info ]; then
+        source ./cluster-info
+fi
+
+PREFIX_HOSTNAME="prod-k8s"
+
+WORKER_NUM=${#WORKER_IP[@]}
 
 NUM=1
 for ((i=0;i<$WORKER_NUM;i++))
 do
-   [ "${WORKER_HOSTNAME[$i]}" == "$HOSTNAME" ] && NUM=$(($i+1))
+   ip addr | grep ${WORKER_IP[i]}  && hostnamectl set-hostname ${PREFIX_HOSTNAME}-node-$(($i+1)) && NUM=$(($i+1))
 done
 
 alias cp='cp -f'
@@ -19,8 +31,6 @@ URL="http://repo.sanyu.com:8080"
 KUBE_VERSION='v1.12.0-rc.1'
 
 yum -y install wget
-
-hostnamectl set-hostname ${WORKER_HOSTNAME[$(($i+1))]}
 
 sudo yum install -y yum-utils device-mapper-persistent-data lvm2
 
