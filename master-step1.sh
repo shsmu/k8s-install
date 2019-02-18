@@ -37,7 +37,6 @@ done
 
 
 MASTER_IP=${CP_IP[0]}
-PREFIX_HOSTNAME="prod-k8s"
 
 WORKER_NUM=${#WORKER_IP[@]}
 
@@ -390,7 +389,7 @@ RestartSec=5
 WantedBy=multi-user.target
 EOF
 
-scp kube-apiserver-${i}.service ${CP_IP[$i]}:/etc/systemd/system/
+scp kube-apiserver-${i}.service ${CP_IP[$i]}:/etc/systemd/system/kube-apiserver.service
 ssh  ${CP_IP[$i]} "sudo systemctl daemon-reload; sudo systemctl enable kube-apiserver;sudo systemctl start kube-apiserver"
 
 done
@@ -421,7 +420,7 @@ EOF
 
 for ((i=0;i<${#CP_IP[@]};i++))
   do
-scp kube-controller-manager.service ${CP_IP[$i]}:/etc/systemd/system/
+scp kube-controller-manager-${i}.service ${CP_IP[$i]}:/etc/systemd/system/kube-controller-manager-${i}.service
 ssh  ${CP_IP[$i]} "sudo systemctl daemon-reload; sudo systemctl enable kube-controller-manager; sudo systemctl start kube-controller-manager"
 
 done
@@ -442,7 +441,7 @@ EOF
 
 for ((i=0;i<${#CP_IP[@]};i++))
   do
-scp kube-scheduler.service ${CP_IP[$i]}:/etc/systemd/system/
+scp kube-scheduler-${i}.service ${CP_IP[$i]}:/etc/systemd/system/kube-scheduler.service
 ssh  ${CP_IP[$i]} "sudo systemctl daemon-reload; sudo systemctl enable kube-scheduler;sudo systemctl start kube-scheduler"
 
 done
