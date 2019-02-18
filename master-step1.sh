@@ -355,7 +355,7 @@ Documentation=https://github.com/kubernetes/kubernetes
 [Service]
 ExecStart=/usr/local/bin/kube-apiserver \\
   --admission-control=Initializers,NamespaceLifecycle,NodeRestriction,LimitRanger,ServiceAccount,DefaultStorageClass,ResourceQuota \\
-  --advertise-address=${CP_IP[$i]}\\
+  --advertise-address=${CP_IP[$i]} \\
   --allow-privileged=true \\
   --audit-log-maxage=30 \\
   --audit-log-maxbackup=3 \\
@@ -368,7 +368,7 @@ ExecStart=/usr/local/bin/kube-apiserver \\
   --etcd-cafile=/var/lib/kubernetes/ca.pem \\
   --etcd-certfile=/var/lib/kubernetes/kubernetes.pem \\
   --etcd-keyfile=/var/lib/kubernetes/kubernetes-key.pem \\
-  --etcd-servers=http://127.0.0.1:2379 \\
+  --etcd-servers=https://${MASTER_IP}:2379 \\
   --event-ttl=1h \\
   --experimental-encryption-provider-config=/var/lib/kubernetes/encryption-config.yaml \\
   --insecure-bind-address=127.0.0.1 \\
