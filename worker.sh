@@ -14,8 +14,6 @@ if [ -f ./cluster-info ]; then
         source ./cluster-info
 fi
 
-PREFIX_HOSTNAME="prod-k8s"
-
 WORKER_NUM=${#WORKER_IP[@]}
 
 NUM=1
@@ -27,8 +25,7 @@ done
 alias cp='cp -f'
 alias mv='mv -f'
 
-URL="http://repo.sanyu.com:8080"
-KUBE_VERSION='v1.12.0-rc.1'
+URL=$REPO
 
 yum -y install wget
 

@@ -17,9 +17,9 @@ fi
 
 echo """
 cluster-info:
-  master-01:        ${CP0_IP}
-  master-02:        ${CP1_IP}
-  master-02:        ${CP2_IP}
+  master-01:        ${CP_IP[0]}
+  master-02:        ${CP_IP[1]}
+  master-02:        ${CP_IP[2]}
   VIP:              ${VIP}
   Net Interface:    ${NET_IF}
   CIDR:             ${CIDR}
@@ -36,7 +36,7 @@ while [ "${AGREE}" != "yes" ]; do
 done
 
 
-MASTER_IP=${CP0_IP}
+MASTER_IP=${CP_IP[0]}
 PREFIX_HOSTNAME="prod-k8s"
 
 WORKER_NUM=${#WORKER_IP[@]}
@@ -45,12 +45,14 @@ WORKER_NUM=${#WORKER_IP[@]}
 alias cp='cp -f'
 alias mv='mv -f'
 
-URL="http://repo.sanyu.com:8080"
-KUBE_VERSION='v1.12.0-rc.1'
+URL=$REPO
 
 yum -y install wget
 
-hostnamectl set-hostname ${PREFIX_HOSTNAME}-master-0
+for ((i=0;i<${#CP_IP[@]};i++))
+  do
+    hostnamectl set-hostname ${PREFIX_HOSTNAME}-master-$i
+done
 
 wget --timestamping \
   http://pkg.cfssl.org/R1.2/cfssl_linux-amd64 \
@@ -214,11 +216,12 @@ cat > kubernetes-csr.json <<EOF
 }
 EOF
 
+ALL_MASTER=`echo ${CP_IP[@]} | tr " " ","`
 cfssl gencert \
   -ca=ca.pem \
   -ca-key=ca-key.pem \
   -config=ca-config.json \
-  -hostname=10.250.0.1,${MASTER_IP},127.0.0.1,kubernetes.default \
+  -hostname=10.250.0.1,${ALL_MASTER},127.0.0.1,kubernetes.default \
   -profile=kubernetes \
   kubernetes-csr.json | cfssljson -bare kubernetes
 
@@ -336,21 +339,24 @@ wget --timestamping \
   "$URL/kubernetes-release/release/${KUBE_VERSION}/bin/linux/amd64/kube-scheduler" \
   "$URL/kubernetes-release/release/${KUBE_VERSION}/bin/linux/amd64/kube-controller-manager"
 
-chmod +x kube-apiserver kube-controller-manager kube-scheduler
-sudo mv kube-apiserver kube-controller-manager kube-scheduler /usr/local/bin/
+for ((i=0;i<${#CP_IP[@]};i++))
+  do
+    chmod +x kube-apiserver kube-controller-manager kube-scheduler
+    sudo scp kube-apiserver kube-controller-manager kube-scheduler ${CP_IP[$i]}:/usr/local/bin/
+    ssh  ${CP_IP[$i]} "sudo mkdir -p /var/lib/kubernetes/"
+    sudo scp ca.pem ca-key.pem kubernetes-key.pem kubernetes.pem encryption-config.yaml  ${CP_IP[$i]}:/var/lib/kubernetes/
+done
 
-sudo mkdir -p /var/lib/kubernetes/
-sudo cp ca.pem ca-key.pem kubernetes-key.pem kubernetes.pem encryption-config.yaml \
-  /var/lib/kubernetes/
-
-cat > kube-apiserver.service <<EOF
+for ((i=0;i<${#CP_IP[@]};i++))
+  do
+cat > kube-apiserver-${i}.service <<EOF
 [Unit]
 Description=Kubernetes API Server
 Documentation=https://github.com/kubernetes/kubernetes
 [Service]
 ExecStart=/usr/local/bin/kube-apiserver \\
   --admission-control=Initializers,NamespaceLifecycle,NodeRestriction,LimitRanger,ServiceAccount,DefaultStorageClass,ResourceQuota \\
-  --advertise-address=${MASTER_IP} \\
+  --advertise-address=${CP_IP[$i]}\\
   --allow-privileged=true \\
   --audit-log-maxage=30 \\
   --audit-log-maxbackup=3 \\
@@ -384,10 +390,10 @@ RestartSec=5
 WantedBy=multi-user.target
 EOF
 
-sudo mv kube-apiserver.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable kube-apiserver
-sudo systemctl start kube-apiserver
+scp kube-apiserver-${i}.service ${CP_IP[$i]}:/etc/systemd/system/
+ssh  ${CP_IP[$i]} "sudo systemctl daemon-reload; sudo systemctl enable kube-apiserver;sudo systemctl start kube-apiserver"
+
+done
 
 cat > kube-controller-manager.service <<EOF
 [Unit]
@@ -413,11 +419,12 @@ RestartSec=5
 WantedBy=multi-user.target
 EOF
 
-sudo mv kube-controller-manager.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable kube-controller-manager
-sudo systemctl start kube-controller-manager
+for ((i=0;i<${#CP_IP[@]};i++))
+  do
+scp kube-controller-manager.service ${CP_IP[$i]}:/etc/systemd/system/
+ssh  ${CP_IP[$i]} "sudo systemctl daemon-reload; sudo systemctl enable kube-controller-manager; sudo systemctl start kube-controller-manager"
 
+done
 cat > kube-scheduler.service <<EOF
 [Unit]
 Description=Kubernetes Scheduler
@@ -433,8 +440,9 @@ RestartSec=5
 WantedBy=multi-user.target
 EOF
 
-sudo mv kube-scheduler.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable kube-scheduler
-sudo systemctl start kube-scheduler
+for ((i=0;i<${#CP_IP[@]};i++))
+  do
+scp kube-scheduler.service ${CP_IP[$i]}:/etc/systemd/system/
+ssh  ${CP_IP[$i]} "sudo systemctl daemon-reload; sudo systemctl enable kube-scheduler;sudo systemctl start kube-scheduler"
 
+done
