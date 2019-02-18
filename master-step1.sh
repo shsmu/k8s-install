@@ -51,7 +51,7 @@ yum -y install wget
 
 for ((i=0;i<${#CP_IP[@]};i++))
   do
-    hostnamectl set-hostname ${PREFIX_HOSTNAME}-master-$i
+    ssh  ${CP_IP[$i]} "hostnamectl set-hostname ${PREFIX_HOSTNAME}-master-$i"
 done
 
 wget --timestamping \
